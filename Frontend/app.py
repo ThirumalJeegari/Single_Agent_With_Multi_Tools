@@ -5,6 +5,18 @@ import pandas as pd
 
 S_URL = "https://single-agent-with-multi-tools.onrender.com"
 
+
+
+def safe_json_response(res):
+    try:
+        return res.json()
+    except Exception:
+        st.error("Backend did not return JSON")
+        st.write("Status Code:", res.status_code)
+        st.write("Backend Response:")
+        st.code(res.text)
+        st.stop()
+
 w_tab, s_tab, web_tab = st.tabs([
     "Weather Tool",
     "SQL Tool",
@@ -30,7 +42,7 @@ with web_tab:
             }
         )
 
-        obj = res.json()
+        obj = safe_json_response(res)
 
         try:
             answer = obj["messages"][-1]["content"]
@@ -101,7 +113,7 @@ with w_tab:
             }
         )
 
-        objRes = res.json()
+        objRes = safe_json_response(res)
 
         
         messages = objRes["messages"][2]["content"]
