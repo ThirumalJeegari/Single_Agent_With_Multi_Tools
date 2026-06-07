@@ -13,55 +13,74 @@ load_dotenv()
 app = FastAPI()
 
 OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
+GROQ_API_KEY = os.getenv("api_key")
+TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
 
-con_obj = mysql.connector.connect(
-    host="localhost",
-    user="root",
-    database="agents",
-    password="10000Coders"
-)
+
+def get_db_connection():
+    return mysql.connector.connect(
+        host=os.getenv("MYSQL_HOST"),
+        user=os.getenv("MYSQL_USER"),
+        database=os.getenv("MYSQL_DATABASE"),
+        password=os.getenv("MYSQL_PASSWORD"),
+        port=int(os.getenv("MYSQL_PORT", 3306))
+    )
+
 
 llm = ChatGroq(
     model="llama-3.3-70b-versatile",
-    api_key=os.getenv("api_key")
+    api_key=GROQ_API_KEY
 )
 
-# Tavily Client
+
 client = TavilyClient(
-    api_key=os.getenv("TAVILY_API_KEY")
+    api_key=TAVILY_API_KEY
 )
 
 
 @tool
 def get_temp_details(city: str):
     """
-    this is to get city weather details
+    Get current weather details for a city using OpenWeather API.
     """
 
-    res = requests.get(f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={OPENWEATHER_API_KEY}&units=metric")
+    url = (
+        f"https://api.openweathermap.org/data/2.5/weather"
+        f"?q={city}&appid={OPENWEATHER_API_KEY}&units=metric"
+    )
 
+    res = requests.get(url)
     data = res.json()
+
     return data
 
 
 @tool
 def sql_tool(query: str):
     """
-    this query is to fetch details from db
+    Fetch details from MySQL database.
+    Only SELECT queries are allowed.
     """
 
+    if not query.strip().lower().startswith("select"):
+        return {"error": "Only SELECT queries are allowed"}
+
+    con_obj = get_db_connection()
     cursor = con_obj.cursor(dictionary=True)
+
     cursor.execute(query)
+    result = cursor.fetchall()
 
-    allEmps = cursor.fetchall()
+    cursor.close()
+    con_obj.close()
 
-    return allEmps
+    return result
 
 
 @tool
 def web_tool(question: str):
     """
-    web search
+    Search the web using Tavily.
     """
 
     result = client.search(
@@ -78,14 +97,21 @@ agent = create_agent(
 )
 
 
+@app.get("/")
+def home():
+    return {
+        "message": "Single Agent With Multiple Tools Backend Running Successfully"
+    }
+
+
 @app.post("/web_tool_calling")
-def incoming_web_search_(question: str = Query(...)):
+def incoming_web_search(question: str = Query(...)):
 
     result = agent.invoke({
         "messages": [
             {
                 "role": "user",
-                "content": f"question:{question}"
+                "content": f"Use web_tool and answer this question: {question}"
             }
         ]
     })
@@ -103,7 +129,7 @@ def incoming_weather_params(
         "messages": [
             {
                 "role": "user",
-                "content": f"city:{city} question:{question}"
+                "content": f"City: {city}. Question: {question}. Use weather tool if needed."
             }
         ]
     })
@@ -118,7 +144,7 @@ def sql_tool_calling_function(question: str = Query(...)):
         "messages": [
             {
                 "role": "user",
-                "content": f"query:{question}"
+                "content": f"Convert this user question into a safe SELECT SQL query and use sql_tool: {question}"
             }
         ]
     })
