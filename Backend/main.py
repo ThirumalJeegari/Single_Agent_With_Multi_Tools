@@ -1,174 +1,101 @@
-from fastapi import FastAPI, Query
+from fastapi import FastAPI,Query
 from langchain.agents import create_agent
 from langchain_groq import ChatGroq
-from langchain.tools import tool
+from langchain.tools import tool 
 import mysql.connector
 import requests
-import os
+import os 
 from tavily import TavilyClient
 from dotenv import load_dotenv
 
 load_dotenv()
+app =FastAPI()
 
-app = FastAPI()
-
-OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
-GROQ_API_KEY = os.getenv("api_key")
-TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
+OPENWEATHER_API_KEY=os.getenv("OPENWEATHER_API_KEY")
 
 
-def get_db_connection():
-    return mysql.connector.connect(
-        host=os.getenv("MYSQL_HOST"),
-        user=os.getenv("MYSQL_USER"),
-        database=os.getenv("MYSQL_DATABASE"),
-        password=os.getenv("MYSQL_PASSWORD"),
-        port=int(os.getenv("MYSQL_PORT", 3306))
-    )
+con_obj=mysql.connector.connect(
+    host="localhost",
+    user="root",
+    database="agents",
+    password="10000Coders"
+)
 
 
-llm = ChatGroq(
+llm=ChatGroq(
     model="llama-3.3-70b-versatile",
-    api_key=GROQ_API_KEY
-)
+    api_key=os.getenv("api_key")
+) # show all employees :-- select * from employees 
 
 
-client = TavilyClient(
-    api_key=TAVILY_API_KEY
-)
-
-
-@tool
-def get_temp_details(city: str):
+@tool 
+def get_temp_details(city:str):
     """
-    Get current weather details for a city using OpenWeather API.
+    this is to get city details 
     """
+    # print(type(city))
+    res=requests.get(f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={OPENWEATHER_API_KEY}")
 
-    url = (
-        f"https://api.openweathermap.org/data/2.5/weather"
-        f"?q={city}&appid={OPENWEATHER_API_KEY}&units=metric"
-    )
-
-    res = requests.get(url)
-    data = res.json()
-
+    data=res.json()
     return data
 
-@tool
-def sql_tool(query: str):
-    """
-    Fetch details from MySQL database.
-    Only SELECT queries are allowed.
-    """
+@tool 
+def sql_tool(query:str): # query = select * from employees  = str
+    """ this query is to fetch details from db """
+    cursor=con_obj.cursor(dictionary=True)
+    cursor.execute(query)
 
-    try:
-        if not query.strip().lower().startswith("select"):
-            return {"error": "Only SELECT queries are allowed"}
+    allEmps=cursor.fetchall()
 
-        con_obj = get_db_connection()
-        cursor = con_obj.cursor(dictionary=True)
-
-        cursor.execute(query)
-        result = cursor.fetchall()
-
-        cursor.close()
-        con_obj.close()
-
-        return result
-
-    except Exception as e:
-        return {
-            "error": "SQL tool failed",
-            "details": str(e)
-        }
-
+    return allEmps
 
 @tool
-def web_tool(question: str):
-    """
-    Search the web using Tavily.
-    """
-
-    result = client.search(
+def web_tool(question:str):
+    """ web search """
+    result=client.search(
         query=question,
-        max_results=5
+        max_limit=5
     )
-
     return result
 
-
-agent = create_agent(
+agent=create_agent(
     model=llm,
-    tools=[get_temp_details, sql_tool, web_tool]
+    tools=[get_temp_details,sql_tool,web_tool] # return
 )
 
+    # api calling :-- cit
 
-@app.get("/")
-def home():
-    return {
-        "message": "Single Agent With Multiple Tools Backend Running Successfully"
-    }
-
+client=TavilyClient(
+        api_key=os.getenv(["tavily_api_key"])
+    )
 
 @app.post("/web_tool_calling")
-def incoming_web_search(question: str = Query(...)):
-
-    result = agent.invoke({
-        "messages": [
-            {
-                "role": "user",
-                "content": f"Use web_tool and answer this question: {question}"
-            }
-        ]
+def incoming_web_search_(question:str=Query(...)):
+    result=agent.invoke({
+        "messages":[{"role":"user","content":f" question:{question}"}]
     })
 
     return result
 
 
 @app.post("/tool_calling")
-def incoming_weather_params(
+def incoming_weather_params( 
     city: str = Query(...),
     question: str = Query(...)
-):
-
-    result = agent.invoke({
-        "messages": [
-            {
-                "role": "user",
-                "content": f"City: {city}. Question: {question}. Use weather tool if needed."
-            }
-        ]
+    ):
+    result=agent.invoke({
+        "messages":[{"role":"user","content":f"city:{city} question:{question}"}]
     })
 
     return result
 
 
 @app.post("/sql_tool_calling")
-def sql_tool_calling_function(question: str = Query(...)):
-
+def sql_tool_calling_function(question:str = Query(...)):
+    
     result = agent.invoke({
-        "messages": [
-            {
-                "role": "user",
-                "content": f"""
-                    You are a MySQL assistant.
-
-                    Use only this table:
-
-                    Table name: employees
-
-                    Columns:
-                    emp_id, full_name, email, company, department, job_role, location,
-                    salary, experience_years, joining_date, employment_type
-
-                    Convert the user question into a safe SELECT query and call sql_tool.
-
-                    Only use SELECT queries.
-
-                    User question: {question}
-                """
-            }
-        ]
+        "messages":[{"role":"user","content":f"query : {question}"}]
     })
 
     return result
+
