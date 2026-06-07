@@ -32,7 +32,14 @@ with web_tab:
 
         obj = res.json()
 
-        st.json(obj)
+        try:
+            answer = obj["messages"][-1]["content"]
+            st.write("### Web Search Result")
+            st.write(answer)
+
+        except Exception as e:
+            st.error(f"Error : {e}")
+            st.json(obj)
 
 
 
