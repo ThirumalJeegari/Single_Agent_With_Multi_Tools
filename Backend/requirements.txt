@@ -1,0 +1,8 @@
+fastapi
+langchain.agents
+langchain_groq 
+langchain.tools
+mysql.connector
+requests
+tavily
+dotenv
