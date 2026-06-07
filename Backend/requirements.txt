@@ -1,8 +1,8 @@
 fastapi
 uvicorn
-langchain
-langchain-groq
 python-dotenv
 requests
 mysql-connector-python
+langchain
+langchain-groq
 tavily-python
