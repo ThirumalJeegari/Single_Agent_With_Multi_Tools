@@ -15,12 +15,15 @@ app = FastAPI()
 OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
 
 
-con_obj = mysql.connector.connect(
-    host="localhost",
-    user="root",
-    database="agents",
-    password="10000Coders"
-)
+# only necessary change: create function instead of direct connection
+def get_db_connection():
+    return mysql.connector.connect(
+        host=os.getenv("MYSQL_HOST", "localhost"),
+        user=os.getenv("MYSQL_USER", "root"),
+        port=int(os.getenv("MYSQL_PORT", "3306")),
+        database=os.getenv("MYSQL_DATABASE", "agents"),
+        password=os.getenv("MYSQL_PASSWORD")
+    )
 
 
 llm = ChatGroq(
@@ -29,7 +32,7 @@ llm = ChatGroq(
 )
 
 
-# minor change: Tavily client moved here
+# minor change: Tavily client should be above web_tool
 client = TavilyClient(
     api_key=os.getenv("tavily_api_key")
 )
@@ -53,10 +56,17 @@ def sql_tool(query: str):
     """
     this query is to fetch details from db
     """
+
+    # only necessary change: connect here
+    con_obj = get_db_connection()
+
     cursor = con_obj.cursor(dictionary=True)
     cursor.execute(query)
 
     allEmps = cursor.fetchall()
+
+    cursor.close()
+    con_obj.close()
 
     return allEmps
 
@@ -68,7 +78,7 @@ def web_tool(question: str):
     """
     result = client.search(
         query=question,
-        max_results=5   # minor change: max_limit changed to max_results
+        max_results=5
     )
 
     return result
@@ -82,16 +92,26 @@ agent = create_agent(
 
 @app.post("/web_tool_calling")
 def incoming_web_search_(question: str = Query(...)):
-    result = agent.invoke({
-        "messages": [
-            {
-                "role": "user",
-                "content": f"question:{question}"
-            }
-        ]
-    })
 
-    return result
+    try:
+        result = agent.invoke({
+            "messages": [
+                {
+                    "role": "user",
+                    "content": f"question:{question}"
+                }
+            ]
+        })
+
+        return result
+
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "error": str(e)
+            }
+        )
 
 
 @app.post("/tool_calling")
@@ -99,28 +119,46 @@ def incoming_weather_params(
     city: str = Query(...),
     question: str = Query(...)
 ):
-    result = agent.invoke({
-        "messages": [
-            {
-                "role": "user",
-                "content": f"city:{city} question:{question}"
-            }
-        ]
-    })
+    try:
+        result = agent.invoke({
+            "messages": [
+                {
+                    "role": "user",
+                    "content": f"city:{city} question:{question}"
+                }
+            ]
+        })
 
-    return result
+        return result
+
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "error": str(e)
+            }
+        )
 
 
 @app.post("/sql_tool_calling")
 def sql_tool_calling_function(question: str = Query(...)):
 
-    result = agent.invoke({
-        "messages": [
-            {
-                "role": "user",
-                "content": f"query : {question}"
-            }
-        ]
-    })
+    try:
+        result = agent.invoke({
+            "messages": [
+                {
+                    "role": "user",
+                    "content": f"query : {question}"
+                }
+            ]
+        })
 
-    return result
+        return result
+
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "error": str(e)
+            }
+        )

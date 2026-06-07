@@ -17,8 +17,13 @@ with web_tab:
             "question": question
         })
 
-        # minor change
-        st.json(res.json())
+        # only necessary change
+        if res.status_code == 200:
+            st.json(res.json())
+        else:
+            st.error("Backend Error")
+            st.write(res.status_code)
+            st.write(res.text)
 
 
 with s_tab:
@@ -29,22 +34,33 @@ with s_tab:
             "question": question
         })
 
-        obj = res.json()
-        messages = obj["messages"][2]["content"]
-        emps = json.loads(messages)
+        # only necessary change
+        if res.status_code == 200:
+            obj = res.json()
+            messages = obj["messages"][2]["content"]
+            emps = json.loads(messages)
 
-        st.write(emps)
+            st.write(emps)
 
-        df = pd.DataFrame(emps)
-        st.dataframe(df)
+            df = pd.DataFrame(emps)
+            st.dataframe(df)
+        else:
+            st.error("Backend Error")
+            st.write(res.status_code)
+            st.write(res.text)
 
 
 with w_tab:
+
     st.title("🌤 AI Weather Agent")
 
-    city = st.text_input("Enter City")
+    city = st.text_input(
+        "Enter City"
+    )
 
-    question = st.text_input("Ask Your Weather Question")
+    question = st.text_input(
+        "Ask Your Weather Question"
+    )
 
     if st.button("Ask Agent"):
         res = requests.post(f"{S_URL}/tool_calling", params={
@@ -52,13 +68,15 @@ with w_tab:
             "question": question
         })
 
-        objRes = res.json()
-        messages = objRes["messages"][2]["content"]
+        # only necessary change
+        if res.status_code == 200:
+            objRes = res.json()
+            messages = objRes["messages"][2]["content"]
+            obj = json.loads(messages)
 
-        obj = json.loads(messages)
-
-        st.write(obj["main"])
-
-        st.write(res.json()["messages"][3]["content"])
-
-        # st.success(res.json()["messages"][-1]["content"])
+            st.write(obj["main"])
+            st.write(res.json()["messages"][3]["content"])
+        else:
+            st.error("Backend Error")
+            st.write(res.status_code)
+            st.write(res.text)
