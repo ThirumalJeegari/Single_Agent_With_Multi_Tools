@@ -63,11 +63,18 @@ def get_temp_details(city: str):
             "error": str(e)
         }
 
-
 @tool
 def sql_tool(query: str):
     """
-    this query is to fetch details from db
+    Execute a MySQL SELECT query.
+
+    Important:
+    - Input must be only one argument: query
+    - Do not pass username
+    - Do not pass password
+    - Do not pass host
+    - Do not pass database name
+    Example input: SELECT * FROM employees
     """
 
     try:
@@ -98,7 +105,6 @@ def sql_tool(query: str):
                 "error": str(e)
             }
         ]
-
 
 @tool
 def web_tool(question: str):
@@ -195,7 +201,6 @@ def incoming_weather_params(
             }
         )
 
-
 @app.post("/sql_tool_calling")
 def sql_tool_calling_function(question: str = Query(...)):
 
@@ -205,15 +210,24 @@ def sql_tool_calling_function(question: str = Query(...)):
                 {
                     "role": "user",
                     "content": f"""
-                    You are a MySQL assistant.
+You are a SQL assistant.
 
-                    Convert the user question into a SELECT query.
-                    Use sql_tool to execute the query.
+Your task:
+1. Convert the user question into a MySQL SELECT query.
+2. Call sql_tool with only this format:
+   sql_tool(query="SELECT ...")
 
-                    Table name: employees
+Rules:
+- Do not pass username.
+- Do not pass password.
+- Do not pass host.
+- Do not pass database.
+- The database connection is already handled inside sql_tool.
+- Use only SELECT queries.
+- Table name is employees.
 
-                    User question: {question}
-                    """
+User question: {question}
+"""
                 }
             ]
         })
