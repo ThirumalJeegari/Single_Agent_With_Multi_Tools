@@ -25,7 +25,6 @@ def get_db_connection():
         password=os.getenv("MYSQL_PASSWORD")
     )
 
-
 llm = ChatGroq(
     model="llama-3.3-70b-versatile",
     api_key=os.getenv("api_key")
