@@ -1,8 +1,8 @@
 fastapi
-langchain.agents
-langchain_groq 
-langchain.tools
-mysql.connector
+uvicorn
+langchain
+langchain-groq
+python-dotenv
 requests
-tavily
-dotenv
+mysql-connector-python
+tavily-python
