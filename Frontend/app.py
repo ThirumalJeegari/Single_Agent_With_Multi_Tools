@@ -96,14 +96,16 @@ with w_tab:
 
         objRes = res.json()
 
-        try:
-            messages = objRes["messages"][2]["content"]
+        
+        messages = objRes["messages"][2]["content"]
 
-            obj = json.loads(messages)
+        obj = json.loads(messages)
 
-            st.write("### Weather Details")
-            st.write(obj["main"])
+        st.write("### Weather Details")
 
-        except Exception as e:
-            st.error(f"Error : {e}")
-            st.json(objRes)
+        st.write(
+            f"Temperature is {obj['main']['temp']}°C. "
+            f"It feels like {obj['main']['feels_like']}°C. "
+            f"Humidity is {obj['main']['humidity']}%. "
+            f"Pressure is {obj['main']['pressure']} hPa."
+        )
