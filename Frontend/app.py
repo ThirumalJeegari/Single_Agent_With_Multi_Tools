@@ -53,42 +53,29 @@ with web_tab:
             st.error(f"Error : {e}")
             st.json(obj)
 
+            
+@app.get("/test_db")
+def test_db():
+    try:
+        con_obj = get_db_connection()
+        cursor = con_obj.cursor(dictionary=True)
 
-with s_tab:
+        cursor.execute("SELECT COUNT(*) AS total_employees FROM employees")
+        result = cursor.fetchone()
 
-    st.title("🗄 AI SQL Agent")
+        cursor.close()
+        con_obj.close()
 
-    question = st.text_input(
-        "Ask a SQL question"
-    )
+        return {
+            "status": "success",
+            "data": result
+        }
 
-    if st.button("GetData"):
-
-        res = requests.post(
-            f"{S_URL}/sql_tool_calling",
-            params={
-                "question": question
-            }
-        )
-
-        obj = safe_json_response(res)
-
-        try:
-            messages = obj["messages"][-1]["content"]
-
-            st.write("### SQL Result")
-            st.write(messages)
-
-            try:
-                emps = json.loads(messages)
-                df = pd.DataFrame(emps)
-                st.dataframe(df)
-            except:
-                pass
-
-        except Exception as e:
-            st.error(f"Error : {e}")
-            st.json(obj)
+    except Exception as e:
+        return {
+            "status": "failed",
+            "error": str(e)
+        }
 
 
 with w_tab:
