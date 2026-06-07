@@ -144,7 +144,23 @@ def sql_tool_calling_function(question: str = Query(...)):
         "messages": [
             {
                 "role": "user",
-                "content": f"Convert this user question into a safe SELECT SQL query and use sql_tool: {question}"
+                "content": f"""
+                    You are a MySQL assistant.
+
+                    Use only this table:
+
+                    Table name: employees
+
+                    Columns:
+                    emp_id, full_name, email, company, department, job_role, location,
+                    salary, experience_years, joining_date, employment_type
+
+                    Convert the user question into a safe SELECT query and call sql_tool.
+
+                    Only use SELECT queries.
+
+                    User question: {question}
+                """
             }
         ]
     })
