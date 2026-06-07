@@ -3,51 +3,101 @@ import requests
 import json
 import pandas as pd
 
-S_URL = "https://single-agent-with-multi-tools.onrender.com"
+S_URL = "http://127.0.0.1:8000"
 
 w_tab, s_tab, web_tab = st.tabs([
     "Weather_Tool", "SQL Tool", "Web Tool"
 ])
 
+
+def safe_post(endpoint, params):
+    res = requests.post(f"{S_URL}{endpoint}", params=params)
+
+    if res.status_code != 200:
+        return None, res.text
+
+    try:
+        return res.json(), None
+    except Exception:
+        return None, res.text
+
+
+def get_tool_content(obj, tool_name):
+    messages = obj.get("messages", [])
+
+    for msg in messages:
+        if msg.get("name") == tool_name:
+            return msg.get("content")
+
+    return None
+
+
+def get_final_answer(obj):
+    messages = obj.get("messages", [])
+
+    if len(messages) == 0:
+        return ""
+
+    return messages[-1].get("content", "")
+
+
+def parse_json_content(content):
+    if content is None:
+        return None
+
+    if isinstance(content, list) or isinstance(content, dict):
+        return content
+
+    try:
+        return json.loads(content)
+    except Exception:
+        return content
+
+
 with web_tab:
     question = st.text_input("Ask a general question ")
 
     if st.button("GetGenData"):
-        res = requests.post(f"{S_URL}/web_tool_calling", params={
+        obj, error = safe_post("/web_tool_calling", {
             "question": question
         })
 
-        # only necessary change
-        if res.status_code == 200:
-            st.json(res.json())
-        else:
+        if error:
             st.error("Backend Error")
-            st.write(res.status_code)
-            st.write(res.text)
+            st.write(error)
+        else:
+            st.write(get_final_answer(obj))
+
+            web_content = get_tool_content(obj, "web_tool")
+            web_data = parse_json_content(web_content)
+
+            st.json(web_data)
 
 
 with s_tab:
     question = st.text_input("Ask a sql question ")
 
     if st.button("GetData"):
-        res = requests.post(f"{S_URL}/sql_tool_calling", params={
+        obj, error = safe_post("/sql_tool_calling", {
             "question": question
         })
 
-        # only necessary change
-        if res.status_code == 200:
-            obj = res.json()
-            messages = obj["messages"][2]["content"]
-            emps = json.loads(messages)
+        if error:
+            st.error("Backend Error")
+            st.write(error)
+        else:
+            st.write(get_final_answer(obj))
+
+            sql_content = get_tool_content(obj, "sql_tool")
+            emps = parse_json_content(sql_content)
 
             st.write(emps)
 
-            df = pd.DataFrame(emps)
-            st.dataframe(df)
-        else:
-            st.error("Backend Error")
-            st.write(res.status_code)
-            st.write(res.text)
+            if isinstance(emps, list):
+                df = pd.DataFrame(emps)
+                st.dataframe(df)
+            else:
+                st.write(emps)
 
 
 with w_tab:
@@ -63,20 +113,24 @@ with w_tab:
     )
 
     if st.button("Ask Agent"):
-        res = requests.post(f"{S_URL}/tool_calling", params={
+        obj, error = safe_post("/tool_calling", {
             "city": city,
             "question": question
         })
 
-        # only necessary change
-        if res.status_code == 200:
-            objRes = res.json()
-            messages = objRes["messages"][2]["content"]
-            obj = json.loads(messages)
-
-            st.write(obj["main"])
-            st.write(res.json()["messages"][3]["content"])
-        else:
+        if error:
             st.error("Backend Error")
-            st.write(res.status_code)
-            st.write(res.text)
+            st.write(error)
+        else:
+            weather_content = get_tool_content(obj, "get_temp_details")
+            weather_data = parse_json_content(weather_content)
+
+            if isinstance(weather_data, dict):
+                if "main" in weather_data:
+                    st.write(weather_data["main"])
+
+                st.json(weather_data)
+            else:
+                st.write(weather_data)
+
+            st.write(get_final_answer(obj))

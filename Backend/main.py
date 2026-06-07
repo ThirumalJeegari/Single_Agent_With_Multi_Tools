@@ -1,10 +1,12 @@
 from fastapi import FastAPI, Query
+from fastapi.responses import JSONResponse
 from langchain.agents import create_agent
 from langchain_groq import ChatGroq
 from langchain.tools import tool
 import mysql.connector
 import requests
 import os
+import json
 from tavily import TavilyClient
 from dotenv import load_dotenv
 
@@ -15,7 +17,13 @@ app = FastAPI()
 OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
 
 
-# only necessary change: create function instead of direct connection
+@app.get("/")
+def home():
+    return {
+        "message": "Backend Running Successfully"
+    }
+
+
 def get_db_connection():
     return mysql.connector.connect(
         host=os.getenv("MYSQL_HOST", "localhost"),
@@ -25,15 +33,15 @@ def get_db_connection():
         password=os.getenv("MYSQL_PASSWORD")
     )
 
+
 llm = ChatGroq(
     model="llama-3.3-70b-versatile",
-    api_key=os.getenv("api_key")
+    api_key=os.getenv("api_key") or os.getenv("GROQ_API_KEY")
 )
 
 
-# minor change: Tavily client should be above web_tool
 client = TavilyClient(
-    api_key=os.getenv("tavily_api_key")
+    api_key=os.getenv("tavily_api_key") or os.getenv("TAVILY_API_KEY")
 )
 
 
@@ -42,12 +50,18 @@ def get_temp_details(city: str):
     """
     this is to get city details
     """
-    res = requests.get(
-        f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={OPENWEATHER_API_KEY}"
-    )
+    try:
+        res = requests.get(
+            f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={OPENWEATHER_API_KEY}&units=metric"
+        )
 
-    data = res.json()
-    return data
+        data = res.json()
+        return data
+
+    except Exception as e:
+        return {
+            "error": str(e)
+        }
 
 
 @tool
@@ -56,18 +70,34 @@ def sql_tool(query: str):
     this query is to fetch details from db
     """
 
-    # only necessary change: connect here
-    con_obj = get_db_connection()
+    try:
+        clean_query = query.strip()
 
-    cursor = con_obj.cursor(dictionary=True)
-    cursor.execute(query)
+        if not clean_query.lower().startswith("select"):
+            return [
+                {
+                    "error": "Only SELECT queries are allowed"
+                }
+            ]
 
-    allEmps = cursor.fetchall()
+        con_obj = get_db_connection()
 
-    cursor.close()
-    con_obj.close()
+        cursor = con_obj.cursor(dictionary=True)
+        cursor.execute(clean_query)
 
-    return allEmps
+        allEmps = cursor.fetchall()
+
+        cursor.close()
+        con_obj.close()
+
+        return allEmps
+
+    except Exception as e:
+        return [
+            {
+                "error": str(e)
+            }
+        ]
 
 
 @tool
@@ -75,12 +105,18 @@ def web_tool(question: str):
     """
     web search
     """
-    result = client.search(
-        query=question,
-        max_results=5
-    )
+    try:
+        result = client.search(
+            query=question,
+            max_results=5
+        )
 
-    return result
+        return result
+
+    except Exception as e:
+        return {
+            "error": str(e)
+        }
 
 
 agent = create_agent(
@@ -89,9 +125,30 @@ agent = create_agent(
 )
 
 
+def make_json_safe(result):
+    safe_messages = []
+
+    for msg in result["messages"]:
+        content = msg.content
+
+        try:
+            json.dumps(content)
+        except Exception:
+            content = str(content)
+
+        safe_messages.append({
+            "type": msg.__class__.__name__,
+            "content": content,
+            "name": getattr(msg, "name", None)
+        })
+
+    return {
+        "messages": safe_messages
+    }
+
+
 @app.post("/web_tool_calling")
 def incoming_web_search_(question: str = Query(...)):
-
     try:
         result = agent.invoke({
             "messages": [
@@ -102,7 +159,7 @@ def incoming_web_search_(question: str = Query(...)):
             ]
         })
 
-        return result
+        return make_json_safe(result)
 
     except Exception as e:
         return JSONResponse(
@@ -128,7 +185,7 @@ def incoming_weather_params(
             ]
         })
 
-        return result
+        return make_json_safe(result)
 
     except Exception as e:
         return JSONResponse(
@@ -147,12 +204,21 @@ def sql_tool_calling_function(question: str = Query(...)):
             "messages": [
                 {
                     "role": "user",
-                    "content": f"query : {question}"
+                    "content": f"""
+                    You are a MySQL assistant.
+
+                    Convert the user question into a SELECT query.
+                    Use sql_tool to execute the query.
+
+                    Table name: employees
+
+                    User question: {question}
+                    """
                 }
             ]
         })
 
-        return result
+        return make_json_safe(result)
 
     except Exception as e:
         return JSONResponse(
