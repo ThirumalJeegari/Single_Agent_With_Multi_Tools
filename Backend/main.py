@@ -54,7 +54,6 @@ def get_temp_details(city: str):
 
     return data
 
-
 @tool
 def sql_tool(query: str):
     """
@@ -62,19 +61,26 @@ def sql_tool(query: str):
     Only SELECT queries are allowed.
     """
 
-    if not query.strip().lower().startswith("select"):
-        return {"error": "Only SELECT queries are allowed"}
+    try:
+        if not query.strip().lower().startswith("select"):
+            return {"error": "Only SELECT queries are allowed"}
 
-    con_obj = get_db_connection()
-    cursor = con_obj.cursor(dictionary=True)
+        con_obj = get_db_connection()
+        cursor = con_obj.cursor(dictionary=True)
 
-    cursor.execute(query)
-    result = cursor.fetchall()
+        cursor.execute(query)
+        result = cursor.fetchall()
 
-    cursor.close()
-    con_obj.close()
+        cursor.close()
+        con_obj.close()
 
-    return result
+        return result
+
+    except Exception as e:
+        return {
+            "error": "SQL tool failed",
+            "details": str(e)
+        }
 
 
 @tool
