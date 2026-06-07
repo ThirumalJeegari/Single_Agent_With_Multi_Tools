@@ -35,7 +35,7 @@ def get_db_connection():
 
 
 llm = ChatGroq(
-    model="llama-3.3-70b-versatile",
+    model="llama-3.1-8b-instant",
     api_key=os.getenv("api_key") or os.getenv("GROQ_API_KEY")
 )
 
