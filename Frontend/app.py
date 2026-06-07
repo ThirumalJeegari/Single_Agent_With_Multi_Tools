@@ -42,7 +42,6 @@ with web_tab:
             st.json(obj)
 
 
-
 with s_tab:
 
     st.title("🗄 AI SQL Agent")
@@ -60,23 +59,24 @@ with s_tab:
             }
         )
 
-        obj = res.json()
+        obj = safe_json_response(res)
 
         try:
-            messages = obj["messages"][2]["content"]
+            messages = obj["messages"][-1]["content"]
 
-            emps = json.loads(messages)
+            st.write("### SQL Result")
+            st.write(messages)
 
-            st.write(emps)
-
-            df = pd.DataFrame(emps)
-
-            st.dataframe(df)
+            try:
+                emps = json.loads(messages)
+                df = pd.DataFrame(emps)
+                st.dataframe(df)
+            except:
+                pass
 
         except Exception as e:
             st.error(f"Error : {e}")
             st.json(obj)
-
 
 
 with w_tab:
