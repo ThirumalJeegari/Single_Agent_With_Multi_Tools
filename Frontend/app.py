@@ -3,7 +3,7 @@ import requests
 import json
 import pandas as pd
 
-S_URL = "http://127.0.0.1:8000"
+S_URL = "https://single-agent-with-multi-tools.onrender.com"
 
 w_tab, s_tab, web_tab = st.tabs([
     "Weather Tool",
